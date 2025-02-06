@@ -1,4 +1,4 @@
-# Expense Tracker API - Stage 1 (On-site)
+# Expense Tracker API
 
 ## Objective
 
