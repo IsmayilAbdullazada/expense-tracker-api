@@ -1,8 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from .models import User, Expense  # Import your models
-from .utils import validate_date_format
-from datetime import datetime
+from .models import User, Expense
+from .utils import validate_date_format, convert_to_iso
 
 bp = Blueprint('routes', __name__)
 
@@ -27,7 +26,7 @@ def register_user():
 @bp.route('/users/login', methods=['POST'])
 def login():
     data = request.get_json()
-    # ... validation (as before) ...
+    # ... validation ...
     if not data or 'username' not in data or 'password' not in data:
         return jsonify({'error': 'Missing username or password'}), 400
 
@@ -45,6 +44,7 @@ def login():
 @jwt_required()
 def create_expense():
     data = request.get_json()
+
     # ... validation ...
     required_fields = ['amount', 'description', 'date', 'category']
     if not all(field in data for field in required_fields):
@@ -58,13 +58,15 @@ def create_expense():
     if not isinstance(data['category'], str):
         return jsonify({'error': 'Category must be a string'}), 400
     if not validate_date_format(data['date']):
-        print(data['date'])
         return jsonify({'error': 'Invalid date format.  Use ISO 8601 format (e.g., YYYY-MM-DDTHH:MM:SSZ).' }), 400
+    
+    # Convert to full ISO 8601 (handling date-only)
+    date_iso = convert_to_iso(data['date'])
 
     current_username = get_jwt_identity()
     user = User.get_by_username(current_username)  # Use model to get user
 
-    expense = Expense(user_id=user.id, amount=data['amount'], description=data['description'], date=data['date'], category=data['category']) # Use Model
+    expense = Expense(user_id=user.id, amount=data['amount'], description=data['description'], date=date_iso, category=data['category'])
     expense.save()
 
     return jsonify({'id': expense.id, 'user_id': expense.user_id, 'amount': expense.amount, 'description': expense.description, 'date': expense.date, 'category': expense.category}), 201
@@ -84,17 +86,15 @@ def list_expenses():
     start_date = None
     end_date = None
 
+    # ... validation ...
     if start_date_str:
-        try:
-            start_date = datetime.fromisoformat(start_date_str.replace('Z', '+00:00')).date().isoformat()
-        except ValueError:
-            return jsonify({'error': 'Invalid start_date format. Use ISO 8601 format.'}), 400
-
+        if not validate_date_format(start_date_str):
+            return jsonify({'error': 'Invalid start date format.  Use ISO 8601 format (e.g., YYYY-MM-DDTHH:MM:SSZ).' }), 400
+        start_date = convert_to_iso(start_date_str)
     if end_date_str:
-        try:
-            end_date = datetime.fromisoformat(end_date_str.replace('Z', '+00:00')).date().isoformat()
-        except ValueError:
-            return jsonify({'error': 'Invalid end_date format. Use ISO 8601 format.'}), 400
+        if not validate_date_format(end_date_str):
+            return jsonify({'error': 'Invalid end date format.  Use ISO 8601 format (e.g., YYYY-MM-DDTHH:MM:SSZ).' }), 400
+        end_date = convert_to_iso(end_date_str)
 
     expenses = Expense.get_all_by_user_id(user.id, start_date, end_date, category)
     expenses_data = [{'id': e.id, 'user_id': e.user_id, 'amount': e.amount, 'description': e.description, 'date': e.date, 'category': e.category} for e in expenses]

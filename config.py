@@ -1,4 +1,3 @@
-# config.py
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
@@ -19,5 +18,4 @@ class TestingConfig(Config):
     DATABASE_URL = ':memory:'  # In-memory DB for tests
 
 class ProductionConfig(Config):
-    # No need to set variables here; they should be set directly on the production server.
     DEBUG = False

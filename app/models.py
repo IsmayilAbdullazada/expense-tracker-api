@@ -86,7 +86,7 @@ class Expense:
       if category:
           query += ' AND category = ?'
           params.append(category)
-      query += ' ORDER BY date DESC'  # Example: Order by date
+      query += ' ORDER BY date DESC'
       cur = db.execute(query, params)
       expenses = []
 

@@ -22,23 +22,4 @@ def init_db(app):
             db.cursor().executescript(f.read())
         db.commit()
 
-        # # --- Check if tables exist ---
-        # cur = db.cursor()
-        # cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users';")
-        # user_table_exists = cur.fetchone() is not None
-
-        # cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='expenses';")
-        # expenses_table_exists = cur.fetchone() is not None
-
-        # if user_table_exists and expenses_table_exists:
-        #     print("Tables created successfully!")
-        # else:
-        #     print("Error: Tables were not created correctly.")
-        #     if not user_table_exists:
-        #         print("  - users table is missing")
-        #     if not expenses_table_exists:
-        #         print("  - expenses table is missing")
-        #     # Consider raising an exception here to halt execution
-        #     # raise Exception("Database initialization failed.")
-
     app.teardown_appcontext(close_db)
