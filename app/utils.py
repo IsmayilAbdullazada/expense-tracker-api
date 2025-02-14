@@ -15,7 +15,12 @@ def validate_date_format(date_str):
         return True
     except ValueError:
         return False
-    
+
+def validate_recurrence_flag(recurrence_flag_str):
+    if recurrence_flag_str not in ['daily', 'weekly', 'monthly']:
+        return False
+    return True
+
 def convert_to_iso(date_str):
     """
     Converts a valid ISO 8601 date or datetime string to a full ISO 8601

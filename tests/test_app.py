@@ -1,43 +1,63 @@
 import json
+from app.routes import User, Expense
 
 def test_register_user(client, register_user):
-    response = register_user('newuser', 'newpassword') # Register a new user
+    response = register_user('newuser', 'Newpassword1)')
     assert response.status_code == 201
-    data = json.loads(response.get_data(as_text=True))
-    assert data['message'] == 'User registered successfully'
+    assert b'User registered successfully' in response.data
+
+    # Direct DB Verification:
+    user = User.get_by_username('newuser')
+    assert user is not None
+    assert user.check_password('Newpassword1)')
 
     # Test duplicate registration
-    response = register_user('newuser', 'anotherpassword') # Register the same user
+    response = register_user('newuser', 'Anotherpassword1)') # Register the same user
     assert response.status_code == 409
-    data = json.loads(response.get_data(as_text=True))
-    assert data['error'] == 'Username already exists'
+    assert b'Username already exists' in response.data
 
     # Test missing fields
     response = client.post('/users/register',
                            data=json.dumps({'username': 'onlyuser'}),
                            content_type='application/json')
     assert response.status_code == 400
+    assert b'Missing username or password' in response.data
+
+    # Test empty password
+    response = client.post('/users/register',
+                           data=json.dumps({'username': 'emptyPass', 'password': ''}),
+                           content_type='application/json')
+    assert response.status_code == 400
+    assert b'Password must be at least 8 characters long.' in response.data
 
 def test_login(client, register_user, login_user):
-    register_user('loguser', 'logpassword')
-    response = login_user('loguser', 'logpassword')
+    register_user('loguser', 'Logpassword1)')
+    response = login_user('loguser', 'Logpassword1)')
     assert response.status_code == 200
     data = json.loads(response.get_data(as_text=True))
     assert 'access_token' in data
 
     # test wrong credentials
-    response = login_user('loguser', 'wrong_password')
+    response = login_user('loguser', 'Wrong_password1')
     assert response.status_code == 401
+    assert b'Invalid credentials' in response.data
 
-    response = login_user('wrong_user', 'logpassword')
+    response = login_user('wrong_user', 'Logpassword1)')
     assert response.status_code == 401
+    assert b'Invalid credentials' in response.data
 
     #test missing fields
     response = client.post('/users/login', data=json.dumps({'username': 'onlyuser'}), content_type='application/json')
     assert response.status_code == 400
+    assert b'Missing username or password' in response.data
+
+    # Test empty password
+    response = client.post('/users/login', data=json.dumps({'username': 'loguser', 'password':''}), content_type='application/json')
+    assert response.status_code == 400
+    assert b'Password must be at least 8 characters long.' in response.data
 
 def test_create_expense(client, token, register_user):
-    register_user('testuser', 'testpassword') # Register the user
+    register_user('testuser', 'Testpassword1)') # Register the user
     headers = {'Authorization': f'Bearer {token}'}
 
     # Test valid expense creation
@@ -70,7 +90,7 @@ def test_create_expense(client, token, register_user):
     assert response.status_code == 401 # Unauthorized
 
 def test_list_expenses(client, token, register_user):
-    register_user('testuser', 'testpassword')  # Register a test user.
+    register_user('testuser', 'Testpassword1)')  # Register a test user.
     headers = {'Authorization': f'Bearer {token}'}
     expense_data = {'amount': 50.0, 'description': 'Groceries', 'date': '2024-07-28T14:30:00Z', 'category': 'Food'}
     response = client.post('/expenses', data=json.dumps(expense_data), content_type='application/json', headers=headers)
@@ -109,7 +129,7 @@ def test_list_expenses(client, token, register_user):
     assert response.status_code == 401  # Unauthorized
 
 def test_get_expense(client, token, register_user):
-    register_user('testuser', 'testpassword')  # Register a test user.
+    register_user('testuser', 'Testpassword1)')  # Register a test user.
     headers = {'Authorization': f'Bearer {token}'}
     expense_data = {'amount': 50.0, 'description': 'Groceries', 'date': '2024-07-28T14:30:00Z', 'category': 'Food'}
     response = client.post('/expenses', data=json.dumps(expense_data), content_type='application/json', headers=headers)
@@ -129,7 +149,7 @@ def test_get_expense(client, token, register_user):
     assert response.status_code == 204
 
 def test_update_expense(client, token, register_user):
-    register_user('testuser', 'testpassword')  # Register a test user.
+    register_user('testuser', 'Testpassword1)')  # Register a test user.
     headers = {'Authorization': f'Bearer {token}'}
     expense_data = {'amount': 50.0, 'description': 'Groceries', 'date': '2024-07-28T14:30:00Z', 'category': 'Food'}
     response = client.post('/expenses', data=json.dumps(expense_data), content_type='application/json', headers=headers)
@@ -156,7 +176,7 @@ def test_update_expense(client, token, register_user):
     assert response.status_code == 401
 
 def test_delete_expense(client, token, register_user):
-    register_user('testuser', 'testpassword')  # Register a test user.
+    register_user('testuser', 'Testpassword1)')  # Register a test user.
     headers = {'Authorization': f'Bearer {token}'}
     expense_data = {'amount': 50.0, 'description': 'Groceries', 'date': '2024-07-28T14:30:00Z', 'category': 'Food'}
     response = client.post('/expenses', data=json.dumps(expense_data), content_type='application/json', headers=headers)

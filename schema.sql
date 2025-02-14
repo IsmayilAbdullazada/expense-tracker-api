@@ -11,5 +11,6 @@ CREATE TABLE IF NOT EXISTS expenses (
   description TEXT NOT NULL,
   date TEXT NOT NULL,
   category TEXT NOT NULL,
+  recurrence_flag TEXT,
   FOREIGN KEY (user_id) REFERENCES users (id)
 );

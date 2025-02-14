@@ -1,4 +1,3 @@
-# tests/conftest.py
 import pytest
 import json
 from app import create_app
@@ -13,7 +12,7 @@ def app():
         init_db(app)
         yield app
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope='function', autouse=True)
 def client(app):
     """A test client for the app."""
     return app.test_client()

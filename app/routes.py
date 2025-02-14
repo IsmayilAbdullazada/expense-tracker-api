@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from .models import User, Expense
-from .utils import validate_date_format, convert_to_iso
+from .utils import validate_date_format, validate_recurrence_flag, convert_to_iso
 
 bp = Blueprint('routes', __name__)
 
@@ -46,7 +46,7 @@ def create_expense():
     data = request.get_json()
 
     # ... validation ...
-    required_fields = ['amount', 'description', 'date', 'category']
+    required_fields = ['amount', 'description', 'date', 'category', 'recurrence_flag']
     if not all(field in data for field in required_fields):
         return jsonify({'error': 'Missing required fields', 'required_fields': required_fields}), 400
     if not isinstance(data['amount'], (int, float)):
@@ -59,17 +59,20 @@ def create_expense():
         return jsonify({'error': 'Category must be a string'}), 400
     if not validate_date_format(data['date']):
         return jsonify({'error': 'Invalid date format.  Use ISO 8601 format (e.g., YYYY-MM-DDTHH:MM:SSZ).' }), 400
-    
+    if not isinstance(data['recurrence_flag'], str):
+        return jsonify({'error': 'Recurrence flag must be a string'}), 400
+    if not validate_recurrence_flag(data['recurrence_flag']):
+        return jsonify({'error': 'Invalid recurrence flag'}), 400
     # Convert to full ISO 8601 (handling date-only)
     date_iso = convert_to_iso(data['date'])
 
     current_username = get_jwt_identity()
     user = User.get_by_username(current_username)  # Use model to get user
 
-    expense = Expense(user_id=user.id, amount=data['amount'], description=data['description'], date=date_iso, category=data['category'])
+    expense = Expense(user_id=user.id, amount=data['amount'], description=data['description'], date=date_iso, category=data['category'], recurrence_flag=data['recurrence_flag'])
     expense.save()
 
-    return jsonify({'id': expense.id, 'user_id': expense.user_id, 'amount': expense.amount, 'description': expense.description, 'date': expense.date, 'category': expense.category}), 201
+    return jsonify({'id': expense.id, 'user_id': expense.user_id, 'amount': expense.amount, 'description': expense.description, 'date': expense.date, 'category': expense.category, 'recurrence_flag': expense.recurrence_flag}), 201
 
 
 @bp.route('/expenses', methods=['GET'])
@@ -97,9 +100,43 @@ def list_expenses():
         end_date = convert_to_iso(end_date_str)
 
     expenses = Expense.get_all_by_user_id(user.id, start_date, end_date, category)
-    expenses_data = [{'id': e.id, 'user_id': e.user_id, 'amount': e.amount, 'description': e.description, 'date': e.date, 'category': e.category} for e in expenses]
+    expenses_data = [{'id': e.id, 'user_id': e.user_id, 'amount': e.amount, 'description': e.description, 'date': e.date, 'category': e.category, 'recurrence_flag': e.recurrence_flag} for e in expenses]
 
     return jsonify(expenses_data), 200
+
+@bp.route('/reports/expenses', methods=['GET'])
+@jwt_required()
+def total_expenses_per_category():
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+
+    # Convert date strings to datetime objects, handling potential errors
+    start_date = None
+    end_date = None
+
+    # ... validation ...
+    if start_date_str:
+        if not validate_date_format(start_date_str):
+            return jsonify({'error': 'Invalid start date format.  Use ISO 8601 format (e.g., YYYY-MM-DDTHH:MM:SSZ).' }), 400
+        start_date = convert_to_iso(start_date_str)
+    if end_date_str:
+        if not validate_date_format(end_date_str):
+            return jsonify({'error': 'Invalid end date format.  Use ISO 8601 format (e.g., YYYY-MM-DDTHH:MM:SSZ).' }), 400
+        end_date = convert_to_iso(end_date_str)
+
+    current_username = get_jwt_identity()
+    user = User.get_by_username(current_username)
+
+    expenses = Expense.get_all_by_user_id(user.id, start_date, end_date)
+
+    totals = {}
+    for expense in expenses:
+        if expense.category in totals:
+            totals[expense.category] += expense.amount
+        else:
+            totals[expense.category] = expense.amount
+
+    return jsonify(totals), 200
 
 @bp.route('/expenses/<int:expense_id>', methods=['GET'])
 @jwt_required()
@@ -143,8 +180,13 @@ def update_expense(expense_id):
         if not isinstance(data['category'], str):
             return jsonify({'error': 'Category must be a string'}), 400
         expense.category = data['category']
+    if 'recurrence_flag' in data:
+        if not isinstance(data['recurrence_flag'], str):
+            return jsonify({'error': 'Recurrence flag must be a string'}), 400
+        if not validate_recurrence_flag(data['recurrence_flag']):
+            return jsonify({'error': 'Invalid recurrence flag'}), 400
     expense.save()
-    return jsonify({'id': expense.id, 'user_id': expense.user_id, 'amount': expense.amount, 'description': expense.description, 'date': expense.date, 'category': expense.category}), 200
+    return jsonify({'id': expense.id, 'user_id': expense.user_id, 'amount': expense.amount, 'description': expense.description, 'date': expense.date, 'category': expense.category, 'recurrence_flag': expense.recurrence_flag}), 200
 
 @bp.route('/expenses/<int:expense_id>', methods=['DELETE'])
 @jwt_required()

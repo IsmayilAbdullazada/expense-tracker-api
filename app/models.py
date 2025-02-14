@@ -1,5 +1,6 @@
 from .database import get_db
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import timedelta
 
 class User:
   def __init__(self, username, password_hash, id=None):
@@ -42,19 +43,20 @@ class User:
       return check_password_hash(self.password_hash, password)
 
 class Expense:
-  def __init__(self, user_id, amount, description, date, category, id=None ):
+  def __init__(self, user_id, amount, description, date, category, recurrence_flag, id=None ):
     self.id = id
     self.user_id = user_id
     self.amount = amount
     self.description = description
     self.date = date
     self.category = category
+    self.recurrence_flag = recurrence_flag
 
   def save(self):
     db = get_db()
     if self.id is None:
-      cur = db.execute('''INSERT INTO expenses (user_id, amount, description, date, category)
-                        VALUES (?,?,?,?,?)''', (self.user_id, self.amount, self.description, self.date, self.category))
+      cur = db.execute('''INSERT INTO expenses (user_id, amount, description, date, category, recurrence_flag)
+                        VALUES (?,?,?,?,?,?)''', (self.user_id, self.amount, self.description, self.date, self.category, self.recurrence_flag))
       db.commit()
       self.id = cur.lastrowid
     else:
@@ -69,7 +71,7 @@ class Expense:
       cur = db.execute('SELECT * FROM expenses WHERE id = ?', (expense_id,))
       row = cur.fetchone()
       if row:
-          return Expense(user_id = row['user_id'], amount = row['amount'], description = row['description'], date = row['date'], category = row['category'], id = row['id'])
+          return Expense(user_id = row['user_id'], amount = row['amount'], description = row['description'], date = row['date'], category = row['category'], recurrence_flag=row['recurrence_flag'], id = row['id'])
       return None
 
   @staticmethod
@@ -91,9 +93,26 @@ class Expense:
       expenses = []
 
       for row in cur.fetchall():
-        expenses.append(Expense(user_id = row['user_id'], amount = row['amount'], description = row['description'], date = row['date'], category = row['category'], id = row['id']))
+        expenses.append(Expense(user_id = row['user_id'], amount = row['amount'], description = row['description'], date = row['date'], category = row['category'], recurrence_flag=row['recurrence_flag'], id = row['id']))
       return expenses
+  
+  def create_recurring_expense(self):
+    new_expense = None
+    if self.recurrence_flag == "daily":
+      new_date = self.date + timedelta(days=1)
+    elif self.recurrence_flag == "weekly":
+      new_date = self.date + timedelta(weeks=1)
+    elif self.recurrence_flag == "monthly":
+      new_date = self.date + timedelta(days=30)
 
+    new_expense = Expense(user_id=self.user_id, amount=self.amount, description=self.description, date=new_date, recurrence_flag=self.recurrence_flag)
+        
+    db = get_db()
+    cur = db.execute('''INSERT INTO expenses (user_id, amount, description, date, category, recurrence_flag)
+                        VALUES (?,?,?,?,?,?)''', (new_expense.user_id, new_expense.amount, new_expense.description, new_expense.date, new_expense.category, new_expense.recurrence_flag))
+    db.commit()
+    # self.id = cur.lastrowid # Update id after insertion.
+                      
   def delete(self):
     db = get_db()
     db.execute('DELETE FROM expenses WHERE id = ?', (self.id,))
